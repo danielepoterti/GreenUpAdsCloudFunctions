@@ -11,22 +11,25 @@ const firestore = admin.firestore();
 //   response.send("Hello from Firebase!");
 // });
 
-function isPending(campagna, docID) {
+async function isPending(campagna, docID) {
+  console.log(campagna.nome + "___INIZIO ESECUZIONE___");
   //console.log(campagna.data_fine.toMillis() < Timestamp.now().toMillis());
   if (campagna.data_fine.toMillis() < Timestamp.now().toMillis()) {
     console.log(campagna.nome + " deve passare da pending a TERMINATE");
-    setCampaingOnTerminate(campagna.id, docID);
+    await setCampaingOnTerminate(campagna.id, docID);
   }
+  console.log(campagna.nome + "___FINE ESECUZIONE___");
 }
 
 async function setCampaingOnTerminate(campagnaID, docID) {
+  console.log(campagnaID + " setCampaingOnTerminate INIZIO");
   var doc = await firestore.collection("listeCampagne").doc(docID).get();
 
   var listaCampagneDoc = doc.data().listaCampagne;
 
   listaCampagneDoc[campagnaID].stato = "terminated";
 
-  firestore
+  await firestore
     .collection("listeCampagne")
     .doc(docID)
     .set({
@@ -37,69 +40,109 @@ async function setCampaingOnTerminate(campagnaID, docID) {
         "La campagna '" + listaCampagneDoc[campagnaID].nome + "' è terminata"
       );
     });
+  console.log(campagnaID + " setCampaingOnTerminate FINE");
 }
 
-function addCampaignToBuyBox(campagna, activityID) {
-  const buyBoxRef = firestore
+async function addCampaignToBuyBox(campagna, activityID) {
+  console.log(campagna.nome + " addCampaignToBuyBox INIZIO");
+  const doc = await firestore
     .collection("listaBuyBox")
-    .doc(campagna.id_colonnina);
+    .doc(campagna.id_colonnina)
+    .get();
 
-  buyBoxRef.get().then((docSnapshot) => {
-    var campagneBuyBox;
-    if (docSnapshot.exists) {
-      campagneBuyBox = docSnapshot.data().campagne;
+  var campagneBuyBox;
+  if (doc.exists) {
+    console.log(campagna.nome + " buyBox esistente aggiunta a esistenti");
+    campagneBuyBox = doc.data().campagneBuyBox;
 
-      campagneBuyBox.push({
+    campagneBuyBox.push({
+      id_attivita: activityID,
+      id_campagna: campagna.id,
+      prezzoMaxPPV: campagna.prezzoMaxPPV,
+    });
+
+    console.log(campagna.nome + " documento creato");
+  } else {
+    console.log(campagna.nome + " buyBox non esistente creazione nuova buyBox");
+    campagneBuyBox = [
+      {
         id_attivita: activityID,
         id_campagna: campagna.id,
-      });
-      console.log("Campagna esiste");
-    } else {
-      campagneBuyBox = [{ id_attivita: activityID, id_campagna: campagna.id }];
-      console.log("Campagna non esiste");
-    }
+        prezzoMaxPPV: campagna.prezzoMaxPPV,
+      },
+    ];
+    console.log(campagna.nome + " documento creato");
+  }
 
-    buyBoxRef.set({ campagneBuyBox }).then(() => {
+  await firestore
+    .collection("listaBuyBox")
+    .doc(campagna.id_colonnina)
+    .set({ campagneBuyBox })
+    .then(() => {
       console.log(campagna.nome + ": campagna aggiunta alla BUYBOX");
     });
-  });
+
+  // buyBoxRef.get().then(async (docSnapshot) => {
+  //   var campagneBuyBox;
+  //   if (docSnapshot.exists) {
+  //     campagneBuyBox = docSnapshot.data().campagneBuyBox;
+
+  //     campagneBuyBox.push({
+  //       id_attivita: activityID,
+  //       id_campagna: campagna.id,
+  //     });
+
+  //     console.log(campagna.nome +" BuyBox esiste");
+  //   } else {
+  //     campagneBuyBox = [{ id_attivita: activityID, id_campagna: campagna.id }];
+  //     console.log(campagna.nome +" BuyBox non esiste");
+  //   }
+
+  //    buyBoxRef.set({ campagneBuyBox }).then(() => {
+  //     console.log(campagna.nome + ": campagna aggiunta alla BUYBOX");
+  //   });
+  // });
+  console.log(campagna.nome + " addCampaignToBuyBox FINE");
 }
 
-function isApproved(campagna, docID) {
+async function isApproved(campagna, docID) {
+  console.log(campagna.nome + "___INIZIO ESECUZIONE___");
   if (
     campagna.data_inizio.toMillis() < Timestamp.now().toMillis() &&
     Timestamp.now().toMillis() < campagna.data_fine.toMillis()
   ) {
-    console.log(campagna.nome + ": Questa campagna deve passare su ACTIVE");
-
-    setCampaingOnActive(campagna.id, docID);
-
     console.log(
       campagna.nome +
         ": Questa campagna deve essere messa nella BuyBox " +
         campagna.id_colonnina
     );
 
-    addCampaignToBuyBox(campagna, docID);
+    await addCampaignToBuyBox(campagna, docID);
+
+    console.log(campagna.nome + ": Questa campagna deve passare su ACTIVE");
+
+    await setCampaingOnActive(campagna.id, docID);
   } else {
     if (campagna.data_fine.toMillis() < Timestamp.now().toMillis()) {
       console.log(
         campagna.nome + ": Questa campagna deve passare su TERMINATED"
       );
 
-      setCampaingOnTerminate(campagna.id, docID);
+      await setCampaingOnTerminate(campagna.id, docID);
     }
   }
+  console.log(campagna.nome + "___FINE ESECUZIONE___");
 }
 
 async function setCampaingOnActive(campagnaID, docID) {
+  console.log(campagnaID + ": setCampaingOnActive INIZIO");
   var doc = await firestore.collection("listeCampagne").doc(docID).get();
 
   var listaCampagneDoc = doc.data().listaCampagne;
 
   listaCampagneDoc[campagnaID].stato = "active";
 
-  firestore
+  await firestore
     .collection("listeCampagne")
     .doc(docID)
     .set({
@@ -112,23 +155,25 @@ async function setCampaingOnActive(campagnaID, docID) {
           "' è stata attivata"
       );
     });
+  console.log(campagnaID + ": setCampaingOnActive FINE");
 }
 
-function isActive(campagna, docID) {
+async function isActive(campagna, docID) {
+  console.log(campagna.nome + "___INIZIO ESECUZIONE___");
   if (campagna.data_fine.toMillis() < Timestamp.now().toMillis()) {
     console.log(campagna.nome + ": Questa campagna deve passare su TERMINATED");
 
-    setCampaingOnTerminate(campagna.id, docID);
+    await setCampaingOnTerminate(campagna.id, docID);
 
     console.log(
       campagna.nome + ": Questa campagna deve essere rimossa dalla buybox"
     );
 
-    deleteCampaignToBuyBox(campagna, docID);
+    await deleteCampaignToBuyBox(campagna, docID);
   } else if (campagna.prezzoMaxPPV > campagna.budgetRimanente) {
     console.log(campagna.nome + ": Questa campagna deve passare su TERMINATED");
 
-    setCampaingOnTerminate(campagna.id, docID);
+    await setCampaingOnTerminate(campagna.id, docID);
 
     console.log(
       campagna.nome +
@@ -136,16 +181,17 @@ function isActive(campagna, docID) {
         campagna.id_colonnina
     );
 
-    deleteCampaignToBuyBox(campagna, docID);
+    await deleteCampaignToBuyBox(campagna, docID);
   }
+  console.log(campagna.nome + "___FINE ESECUZIONE___");
 }
 
-function deleteCampaignToBuyBox(campagna, activityID) {
+async function deleteCampaignToBuyBox(campagna, activityID) {
   const buyBoxRef = firestore
     .collection("listaBuyBox")
     .doc(campagna.id_colonnina);
 
-  buyBoxRef.get().then((docSnapshot) => {
+  await buyBoxRef.get().then(async (docSnapshot) => {
     var campagneBuyBox = docSnapshot.data().campagneBuyBox;
 
     // campagneBuyBox.push({
@@ -163,7 +209,7 @@ function deleteCampaignToBuyBox(campagna, activityID) {
 
     // console.log("Campagna esiste");
 
-    buyBoxRef.set({ campagneBuyBox }).then(() => {
+    await buyBoxRef.set({ campagneBuyBox }).then(() => {
       console.log(campagna.nome + ": campagna eliminata dalla BUYBOX");
     });
   });
@@ -173,25 +219,73 @@ exports.scheduledFunction = functions.pubsub
   .schedule("*/1 * * * *")
   .onRun(async (context) => {
     const snapshot = await firestore.collection("listeCampagne").get();
-    snapshot.docs.map((doc) => {
+    snapshot.docs.map(async (doc) => {
       let listaCampagne = doc.data().listaCampagne;
 
-      listaCampagne.forEach((campagna) => {
+      // listaCampagne.forEach(async (campagna) => {
+      //   switch (campagna.stato) {
+      //     case "pending":
+      //       isPending(campagna, doc.id);
+      //       break;
+      //     case "approved":
+      //       await isApproved(campagna, doc.id);
+      //       break;
+      //     case "active":
+      //       isActive(campagna, doc.id);
+      //       break;
+      //     case "terminated":
+      //       break;
+      //     default:
+      //       break;
+      //   }
+      // });
+
+      for (const campagna of listaCampagne) {
         switch (campagna.stato) {
           case "pending":
-            isPending(campagna, doc.id);
+            await isPending(campagna, doc.id);
             break;
           case "approved":
-            isApproved(campagna, doc.id);
+            await isApproved(campagna, doc.id);
             break;
           case "active":
-            isActive(campagna, doc.id);
+            await isActive(campagna, doc.id);
             break;
           case "terminated":
             break;
           default:
             break;
         }
-      });
+      }
     });
   });
+
+/**
+ * ALGORITMO AD OGNI RICHIESTA
+ */
+
+exports.getCampaign = functions.https.onRequest(async (req, res) => {
+  var buyBox = await fetchBuyBox(req.query.id_colonnina);
+
+  if (buyBox.exists) {
+    var buyBoxData = buyBox.data();
+    if (buyBoxData.campagneBuyBox === []) {
+      res.send(null);
+    } else {
+      fetchCampaignsArray(buyBoxData.campagneBuyBox);
+    }
+  } else {
+    res.send(null);
+  }
+});
+
+function fetchBuyBox(idColonnina) {
+  const buyBoxRef = firestore.collection("listaBuyBox").doc(idColonnina);
+  return buyBoxRef.get();
+}
+
+function fetchCampaignsArray(referenceArray) {
+  totale = 0;
+  for (const campagna of referenceArray) {
+  }
+}
