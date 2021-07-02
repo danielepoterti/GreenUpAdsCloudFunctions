@@ -22,27 +22,25 @@ const storage = admin.storage().bucket();
 //   console.log(campagna.nome + "___FINE ESECUZIONE___");
 // }
 
-// async function setCampaingOnTerminate(campagnaID, docID) {
-//   console.log(campagnaID + " setCampaingOnTerminate INIZIO");
-//   var doc = await firestore.collection("listeCampagne").doc(docID).get();
+async function setCampaingOnTerminate(campagnaID, docID) {
+  console.log(campagnaID + " setCampaingOnTerminate INIZIO");
+  var doc = await firestore.collection("listeCampagne").doc(docID).get();
 
-//   var listaCampagneDoc = doc.data().listaCampagne;
+  var listaCampagneDoc = doc.data().listaCampagne;
 
-//   listaCampagneDoc[campagnaID].stato = "terminated";
+  for (var i in listaCampagneDoc) {
+    if (listaCampagneDoc[i].id === campagnaID) {
+      listaCampagneDoc[i].stato = "terminated";
+      break;
+    }
+  }
+  //listaCampagneDoc[campagnaID].stato = "terminated";
 
-//   await firestore
-//     .collection("listeCampagne")
-//     .doc(docID)
-//     .set({
-//       listaCampagne: listaCampagneDoc,
-//     })
-//     .then(() => {
-//       console.log(
-//         "La campagna '" + listaCampagneDoc[campagnaID].nome + "' è terminata"
-//       );
-//     });
-//   console.log(campagnaID + " setCampaingOnTerminate FINE");
-// }
+  await firestore.collection("listeCampagne").doc(docID).set({
+    listaCampagne: listaCampagneDoc,
+  });
+  console.log(campagnaID + " setCampaingOnTerminate FINE");
+}
 
 // async function addCampaignToBuyBox(campagna, activityID) {
 //   console.log(campagna.nome + " addCampaignToBuyBox INIZIO");
@@ -159,62 +157,62 @@ const storage = admin.storage().bucket();
 //   console.log(campagnaID + ": setCampaingOnActive FINE");
 // }
 
-// async function isActive(campagna, docID) {
-//   console.log(campagna.nome + "___INIZIO ESECUZIONE___");
-//   if (campagna.data_fine.toMillis() < Timestamp.now().toMillis()) {
-//     console.log(campagna.nome + ": Questa campagna deve passare su TERMINATED");
+async function isActive(campagna, docID) {
+  console.log(campagna.nome + "___INIZIO ESECUZIONE___");
+  if (campagna.data_fine.toMillis() < Timestamp.now().toMillis()) {
+    console.log(campagna.nome + ": Questa campagna deve passare su TERMINATED");
 
-//     await setCampaingOnTerminate(campagna.id, docID);
+    await setCampaingOnTerminate(campagna.id, docID);
 
-//     console.log(
-//       campagna.nome + ": Questa campagna deve essere rimossa dalla buybox"
-//     );
+    console.log(
+      campagna.nome + ": Questa campagna deve essere rimossa dalla buybox"
+    );
 
-//     await deleteCampaignToBuyBox(campagna, docID);
-//   } else if (campagna.prezzoMaxPPV > campagna.budgetRimanente) {
-//     console.log(campagna.nome + ": Questa campagna deve passare su TERMINATED");
+    await deleteCampaignToBuyBox(campagna, docID);
+  } else if (campagna.prezzoMaxPPV > campagna.budgetRimanente) {
+    console.log(campagna.nome + ": Questa campagna deve passare su TERMINATED");
 
-//     await setCampaingOnTerminate(campagna.id, docID);
+    await setCampaingOnTerminate(campagna.id, docID);
 
-//     console.log(
-//       campagna.nome +
-//         ": Questa campagna deve essere rimossa dalla buybox" +
-//         campagna.id_colonnina
-//     );
+    console.log(
+      campagna.nome +
+        ": Questa campagna deve essere rimossa dalla buybox" +
+        campagna.id_colonnina
+    );
 
-//     await deleteCampaignToBuyBox(campagna, docID);
-//   }
-//   console.log(campagna.nome + "___FINE ESECUZIONE___");
-// }
+    await deleteCampaignToBuyBox(campagna, docID);
+  }
+  console.log(campagna.nome + "___FINE ESECUZIONE___");
+}
 
-// async function deleteCampaignToBuyBox(campagna, activityID) {
-//   const buyBoxRef = firestore
-//     .collection("listaBuyBox")
-//     .doc(campagna.id_colonnina);
+async function deleteCampaignToBuyBox(campagna, activityID) {
+  const buyBoxRef = firestore
+    .collection("listaBuyBox")
+    .doc(campagna.id_colonnina);
 
-//   await buyBoxRef.get().then(async (docSnapshot) => {
-//     var campagneBuyBox = docSnapshot.data().campagneBuyBox;
+  await buyBoxRef.get().then(async (docSnapshot) => {
+    var campagneBuyBox = docSnapshot.data().campagneBuyBox;
 
-//     // campagneBuyBox.push({
-//     //   id_attivita: activityID,
-//     //   id_campagna: campagna.id,
-//     // });
+    // campagneBuyBox.push({
+    //   id_attivita: activityID,
+    //   id_campagna: campagna.id,
+    // });
 
-//     var deleteIndex = campagneBuyBox.findIndex(
-//       (element) =>
-//         element.id_attivita === activityID &&
-//         element.id_campagna === campagna.id
-//     );
+    var deleteIndex = campagneBuyBox.findIndex(
+      (element) =>
+        element.id_attivita === activityID &&
+        element.id_campagna === campagna.id
+    );
 
-//     campagneBuyBox.splice(deleteIndex, 1);
+    campagneBuyBox.splice(deleteIndex, 1);
 
-//     // console.log("Campagna esiste");
+    // console.log("Campagna esiste");
 
-//     await buyBoxRef.set({ campagneBuyBox }).then(() => {
-//       console.log(campagna.nome + ": campagna eliminata dalla BUYBOX");
-//     });
-//   });
-// }
+    await buyBoxRef.set({ campagneBuyBox }).then(() => {
+      console.log(campagna.nome + ": campagna eliminata dalla BUYBOX");
+    });
+  });
+}
 
 // exports.scheduledFunction = functions.pubsub
 //   .schedule("*/1 * * * *")
@@ -273,12 +271,11 @@ exports.getCampaign = functions.https.onRequest(async (req, res) => {
     if (buyBoxData.campagneBuyBox === []) {
       res.send(null);
     } else {
-      let campagnaScelta = fetchCampaignsArray(buyBoxData.campagneBuyBox);
-
-      //res.send(campagnaScelta);
-
-      let URL = fetchLinkImageCampaign(campagnaScelta);
+      let campagnaScelta = fetchRandomCampaignsArray(buyBoxData.campagneBuyBox);
+      let campagne = await fetchCampagne(campagnaScelta);
+      let URL = await fetchLinkImageCampaign(campagnaScelta, campagne);
       res.send(URL);
+      payCampaign(campagnaScelta, buyBoxData.campagneBuyBox, campagne);
     }
   } else {
     res.send(null);
@@ -290,7 +287,7 @@ function fetchBuyBox(idColonnina) {
   return buyBoxRef.get();
 }
 
-function fetchCampaignsArray(referenceArray) {
+function fetchRandomCampaignsArray(referenceArray) {
   let total = 0;
   for (const campagna of referenceArray) {
     total += campagna.prezzoMaxPPV;
@@ -306,27 +303,111 @@ function fetchCampaignsArray(referenceArray) {
   }
 }
 
-async function fetchLinkImageCampaign(campaign) {
+async function fetchCampagne(campaign) {
   const campaignRef = firestore
     .collection("listeCampagne")
     .doc(campaign.id_attivita);
 
   let campagne = await campaignRef.get();
   campagne = campagne.data().listaCampagne;
+
+  return campagne;
+}
+
+async function fetchLinkImageCampaign(campaignSelected, campagne) {
+  // const campaignRef = firestore
+  //   .collection("listeCampagne")
+  //   .doc(campaign.id_attivita);
+
+  // let campagne = await campaignRef.get();
+  // campagne = campagne.data().listaCampagne;
   //console.log(campagne);
 
   let campagna = campagne.find(
-    (element) => element.id === campaign.id_campagna
+    (element) => element.id === campaignSelected.id_campagna
   );
 
-  console.log("A0")
-
   const options = {
-    action: 'read',
-    expires: '03-17-2025'
+    action: "read",
+    expires: Date.now() + 2 * 60 * 1000, // scadenza di 2 minuti
   };
 
-  console.log(await storage.file(campagna.image).getMetadata());
+  console.log(await storage.file(campagna.image).getSignedUrl(options));
 
-  return storage.file(campagna.image);
+  return storage.file(campagna.image).getSignedUrl(options);
+}
+
+function payCampaign(campagnaScelta, campagneBuyBox, campagne) {
+  let auctionBeating = campagnaScelta.prezzoMaxPPV;
+  let maxPPV = selectMAXPPV(campagneBuyBox);
+  console.log(campagnaScelta);
+  console.log("auctionBeating: " + auctionBeating);
+  console.log("maxPPV: " + maxPPV);
+  let toBePayed = null;
+  if (auctionBeating == maxPPV) {
+    console.log("PAGARE IL SECONDO MASSIMO + 0.01");
+    toBePayed = selectSecondMAXPPV(campagneBuyBox, maxPPV) + 0.01;
+    console.log(toBePayed + " pagato");
+  } else {
+    //pagare l'equivalente del auctionBeating
+    console.log("PAGARE IL AUCTIONBEATING");
+    toBePayed = auctionBeating;
+    console.log(toBePayed + " pagato");
+  }
+}
+
+function selectSecondMAXPPV(campagneBuyBox, maxPPV) {
+  //let maxPPV = selectMAXPPV(campagneBuyBox);
+  return Math.max.apply(
+    Math,
+    campagneBuyBox.map(function (o) {
+      if (o.prezzoMaxPPV === maxPPV) {
+        return -1;
+      } else {
+        return o.prezzoMaxPPV;
+      }
+    })
+  );
+}
+
+function selectMAXPPV(campagneBuyBox) {
+  return Math.max.apply(
+    Math,
+    campagneBuyBox.map(function (o) {
+      return o.prezzoMaxPPV;
+    })
+  );
+}
+
+function updateCampaigns(campagne, campagnaScelta, toBePayed) {
+  let campagna = campagne.find(
+    (element) => element.id === campagnaScelta.id_campagna
+  );
+
+  campagna.budgetRimanente -= toBePayed;
+
+  for (var i in campagne) {
+    if (campagne[i].id === campagnaScelta.id_campagna) {
+      campagne[i] = campagna;
+      break;
+    }
+  }
+
+  await firestore.collection("listeCampagne").doc(campagnaScelta.id_attivita).set({
+    listaCampagne: campagne,
+  });
+
+  if (campagna.prezzoMaxPPV > campagna.budgetRimanente) {
+    console.log(campagna.nome + ": Questa campagna deve passare su TERMINATED");
+
+    await setCampaingOnTerminate(campagna.id, campagnaScelta.id_attivita);
+
+    console.log(
+      campagna.nome +
+        ": Questa campagna deve essere rimossa dalla buybox" +
+        campagna.id_colonnina
+    );
+
+    await deleteCampaignToBuyBox(campagna, campagnaScelta.id_attivita);
+  }
 }
