@@ -268,14 +268,14 @@ exports.getCampaign = functions.https.onRequest(async (req, res) => {
 
   if (buyBox.exists) {
     var buyBoxData = buyBox.data();
-    if (buyBoxData.campagneBuyBox === []) {
+    if (buyBoxData.campagneBuyBox === [] || buyBoxData.campagneBuyBox.length === 0) {
       res.send(null);
     } else {
       let campagnaScelta = fetchRandomCampaignsArray(buyBoxData.campagneBuyBox);
       let campagne = await fetchCampagne(campagnaScelta);
       let URL = await fetchLinkImageCampaign(campagnaScelta, campagne);
       res.send(URL);
-      payCampaign(campagnaScelta, buyBoxData.campagneBuyBox, campagne);
+      await payCampaign(campagnaScelta, buyBoxData.campagneBuyBox, campagne);
     }
   } else {
     res.send(null);
@@ -337,7 +337,7 @@ async function fetchLinkImageCampaign(campaignSelected, campagne) {
   return storage.file(campagna.image).getSignedUrl(options);
 }
 
-function payCampaign(campagnaScelta, campagneBuyBox, campagne) {
+async function payCampaign(campagnaScelta, campagneBuyBox, campagne) {
   let auctionBeating = campagnaScelta.prezzoMaxPPV;
   let maxPPV = selectMAXPPV(campagneBuyBox);
   console.log(campagnaScelta);
@@ -346,12 +346,20 @@ function payCampaign(campagnaScelta, campagneBuyBox, campagne) {
   let toBePayed = null;
   if (auctionBeating == maxPPV) {
     console.log("PAGARE IL SECONDO MASSIMO + 0.01");
-    toBePayed = selectSecondMAXPPV(campagneBuyBox, maxPPV) + 0.01;
+    //IF NON ESISTE SECONDO?
+    if (campagneBuyBox.length === 1) {
+      toBePayed = auctionBeating;
+    } else {
+      toBePayed = selectSecondMAXPPV(campagneBuyBox, maxPPV) + 0.01;
+    }
+
+    await updateCampaigns(campagne, campagnaScelta, toBePayed);
     console.log(toBePayed + " pagato");
   } else {
     //pagare l'equivalente del auctionBeating
     console.log("PAGARE IL AUCTIONBEATING");
     toBePayed = auctionBeating;
+    await updateCampaigns(campagne, campagnaScelta, toBePayed);
     console.log(toBePayed + " pagato");
   }
 }
@@ -379,7 +387,7 @@ function selectMAXPPV(campagneBuyBox) {
   );
 }
 
-function updateCampaigns(campagne, campagnaScelta, toBePayed) {
+async function updateCampaigns(campagne, campagnaScelta, toBePayed) {
   let campagna = campagne.find(
     (element) => element.id === campagnaScelta.id_campagna
   );
@@ -393,9 +401,12 @@ function updateCampaigns(campagne, campagnaScelta, toBePayed) {
     }
   }
 
-  await firestore.collection("listeCampagne").doc(campagnaScelta.id_attivita).set({
-    listaCampagne: campagne,
-  });
+  await firestore
+    .collection("listeCampagne")
+    .doc(campagnaScelta.id_attivita)
+    .set({
+      listaCampagne: campagne,
+    });
 
   if (campagna.prezzoMaxPPV > campagna.budgetRimanente) {
     console.log(campagna.nome + ": Questa campagna deve passare su TERMINATED");
