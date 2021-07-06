@@ -268,7 +268,10 @@ exports.getCampaign = functions.https.onRequest(async (req, res) => {
 
   if (buyBox.exists) {
     var buyBoxData = buyBox.data();
-    if (buyBoxData.campagneBuyBox === [] || buyBoxData.campagneBuyBox.length === 0) {
+    if (
+      buyBoxData.campagneBuyBox === [] ||
+      buyBoxData.campagneBuyBox.length === 0
+    ) {
       res.send(null);
     } else {
       let campagnaScelta = fetchRandomCampaignsArray(buyBoxData.campagneBuyBox);
@@ -421,4 +424,45 @@ async function updateCampaigns(campagne, campagnaScelta, toBePayed) {
 
     await deleteCampaignToBuyBox(campagna, campagnaScelta.id_attivita);
   }
+}
+
+/**
+ *  GESTIONE NOTIFICHE
+ */
+exports.getNotifications = functions.https.onRequest(async (req, res) => {
+  console.log(req.query.UUID);
+  res.send(await fetchCampagneApproved(req.query.UUID));
+});
+
+async function fetchCampagneApproved(UUID) {
+  var docCampagne = await firestore.collection("listeCampagne").doc(UUID).get();
+  var docNotifiche = await firestore.collection("datiNotifiche").doc(UUID).get();
+
+  var listaCampagneDoc = docCampagne.data().listaCampagne;
+  var listaNotificheDoc = docNotifiche.data().listaNotifiche;
+
+  console.log(listaCampagneDoc);
+  console.log(listaNotificheDoc);
+
+  for (const campagna of listaCampagneDoc) {
+    if (campagna.stato == "approved") {
+      index = listaNotificheDoc.findIndex(
+        (element) => element.id === campagna.id
+      );
+      if (index === -1) {
+        listaNotificheDoc.push({
+          id: campagna.id,
+          type: "approved",
+          seen: false,
+        });
+      } else {
+      }
+    }
+  }
+
+  await firestore.collection("datiNotifiche").doc(UUID).set({
+    listaNotifiche: listaNotificheDoc,
+  });
+
+  return listaNotificheDoc;
 }
