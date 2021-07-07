@@ -429,20 +429,23 @@ async function updateCampaigns(campagne, campagnaScelta, toBePayed) {
 /**
  *  GESTIONE NOTIFICHE
  */
-exports.getNotifications = functions.https.onRequest(async (req, res) => {
-  console.log(req.query.UUID);
-  res.send(await fetchCampagneApproved(req.query.UUID));
+exports.getNotifications = functions.https.onCall(async (data, context) => {
+  //console.log(data.UUID);
+  return await fetchCampagneApproved(data.UUID);
 });
 
 async function fetchCampagneApproved(UUID) {
   var docCampagne = await firestore.collection("listeCampagne").doc(UUID).get();
-  var docNotifiche = await firestore.collection("datiNotifiche").doc(UUID).get();
+  var docNotifiche = await firestore
+    .collection("datiNotifiche")
+    .doc(UUID)
+    .get();
 
   var listaCampagneDoc = docCampagne.data().listaCampagne;
   var listaNotificheDoc = docNotifiche.data().listaNotifiche;
 
-  console.log(listaCampagneDoc);
-  console.log(listaNotificheDoc);
+  //console.log(listaCampagneDoc);
+  //console.log(listaNotificheDoc);
 
   for (const campagna of listaCampagneDoc) {
     if (campagna.stato == "approved") {
@@ -451,6 +454,8 @@ async function fetchCampagneApproved(UUID) {
       );
       if (index === -1) {
         listaNotificheDoc.push({
+          title: "La tua campagna è stata approvata",
+          description: "Abbiamo approvato la tua campagna " + campagna.nome,
           id: campagna.id,
           type: "approved",
           seen: false,
@@ -464,5 +469,5 @@ async function fetchCampagneApproved(UUID) {
     listaNotifiche: listaNotificheDoc,
   });
 
-  return listaNotificheDoc;
+  return listaNotificheDoc.filter((notifica) => notifica.seen === false);
 }
