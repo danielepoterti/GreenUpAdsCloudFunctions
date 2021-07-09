@@ -450,17 +450,42 @@ async function fetchCampagneApproved(UUID) {
   for (const campagna of listaCampagneDoc) {
     if (campagna.stato == "approved") {
       index = listaNotificheDoc.findIndex(
-        (element) => element.id === campagna.id
+        (element) => element.id === campagna.id + "approved"
       );
       if (index === -1) {
         listaNotificheDoc.push({
           title: "La tua campagna è stata approvata",
           description: "Abbiamo approvato la tua campagna " + campagna.nome,
-          id: campagna.id,
+          id: campagna.id + "approved",
           type: "approved",
           seen: false,
         });
-      } else {
+      }
+    } else if (campagna.stato == "active") {
+      index = listaNotificheDoc.findIndex(
+        (element) => element.id === campagna.id + "active"
+      );
+      if (index === -1) {
+        listaNotificheDoc.push({
+          title: "La tua campagna è stata attivata",
+          description: "Abbiamo attivato la tua campagna " + campagna.nome,
+          id: campagna.id + "active",
+          type: "active",
+          seen: false,
+        });
+      }
+    } else if (campagna.stato == "terminated") {
+      index = listaNotificheDoc.findIndex(
+        (element) => element.id === campagna.id + "terminated"
+      );
+      if (index === -1) {
+        listaNotificheDoc.push({
+          title: "La tua campagna è stata terminata",
+          description: "Abbiamo terminato la tua campagna " + campagna.nome,
+          id: campagna.id + "terminated",
+          type: "terminated",
+          seen: false,
+        });
       }
     }
   }
@@ -470,4 +495,33 @@ async function fetchCampagneApproved(UUID) {
   });
 
   return listaNotificheDoc.filter((notifica) => notifica.seen === false);
+}
+
+exports.setSeeNotifications = functions.https.onCall(async (data, context) => {
+  //console.log(data.UUID);
+  return await setNotificationsSee(data.UUID);
+});
+
+async function setNotificationsSee(UUID) {
+  var docNotifiche = await firestore
+    .collection("datiNotifiche")
+    .doc(UUID)
+    .get();
+
+  var listaNotificheDoc = docNotifiche.data().listaNotifiche;
+
+  //console.log(listaCampagneDoc);
+  //console.log(listaNotificheDoc);
+
+  for (let i = 0; i < listaNotificheDoc.length; i++) {
+    if (listaNotificheDoc[i].seen === false) {
+      listaNotificheDoc[i].seen = true;
+    }
+  }
+
+  await firestore.collection("datiNotifiche").doc(UUID).set({
+    listaNotifiche: listaNotificheDoc,
+  });
+
+  return "OK";
 }
