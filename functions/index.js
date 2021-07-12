@@ -4,6 +4,7 @@ const { Timestamp } = require("@google-cloud/firestore");
 admin.initializeApp();
 const firestore = admin.firestore();
 const storage = admin.storage().bucket();
+const database = admin.database();
 // // Create and Deploy Your First Cloud Functions
 // // https://firebase.google.com/docs/functions/write-firebase-functions
 //
@@ -528,12 +529,13 @@ async function setNotificationsSee(UUID) {
 
 //STRIPE FUNCTION
 exports.createStripeCheckout = functions.https.onCall(async (data, context) => {
+  const ref = database.ref();
   const stripe = require("stripe")(functions.config().stripe.secret_key);
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ["card"],
     mode: "payment",
-    success_url: "http://localhost:3000/success",
-    cancel_url: "http://localhost:3000/cancel",
+    success_url: `http://localhost:3000/dashboard/saldoRiepilogo/session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: "http://localhost:3000/cancel?false",
     line_items: [
       {
         quantity: 1,
@@ -547,6 +549,7 @@ exports.createStripeCheckout = functions.https.onCall(async (data, context) => {
       },
     ],
   });
+  ref.child(session.id).set(session);
   return {
     id: session.id,
     url: session.url,
