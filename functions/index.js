@@ -575,9 +575,9 @@ exports.stripeWebHook = functions.https.onRequest(async (req, res)=>{
   }
   const dataObject = event.data.object;
   const user = event.data.object.metadata.user;
-  let saldo = await admin.firestore().collection('datiFiscali').doc(user).get();
+  let saldo = await firestore.collection('datiFiscali').doc(user).get();
   saldo = saldo.data().saldo;
-  saldo += event.data.object.total / 1000;
+  saldo += event.data.object.amount_total / 100;
   let newSaldo = {saldo: saldo};
-  await admin.firestore().collection('datiFiscali').doc(user).set(newSaldo); //update saldo in firestore.
+  await firestore.collection('datiFiscali').doc(user).set(newSaldo); //update saldo in firestore.
 })
