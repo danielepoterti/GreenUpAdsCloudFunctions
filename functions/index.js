@@ -527,15 +527,18 @@ async function setNotificationsSee(UUID) {
   return "OK";
 }
 
-//STRIPE FUNCTION
+//STRIPE FUNCTION TO CREATE A SESSION
 exports.createStripeCheckout = functions.https.onCall(async (data, context) => {
   const ref = database.ref();
   const stripe = require("stripe")(functions.config().stripe.secret_key);
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ["card"],
     mode: "payment",
-    success_url: `http://localhost:3000/dashboard/saldoRiepilogo/session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: "http://localhost:3000/cancel?false",
+    success_url: `http://localhost:3000/success`,
+    cancel_url: "http://localhost:3000/fail",
+    metadata: {
+      user: data.uid,
+    },
     line_items: [
       {
         quantity: 1,
@@ -549,9 +552,32 @@ exports.createStripeCheckout = functions.https.onCall(async (data, context) => {
       },
     ],
   });
-  ref.child(session.id).set(session);
+  //ref.child(session.id).set(session);
   return {
     id: session.id,
     url: session.url,
   };
 });
+//STRIPE WebHook to verify the signature
+exports.stripeWebHook = functions.https.onRequest(async (req, res)=>{
+  const stripe = require('stripe')(functions.config().stripe.secret_key);
+  let event;
+  try{
+    const whSec = functions.config().stripe.payments_webhook_secret;
+    event = stripe.webhooks.constructEvent(
+      req.rawBody,
+      req.headers['stripe-signature'],
+      whSec,
+    );
+  }catch (err){
+    //signature failed
+    return res.sendStatus(400);
+  }
+  const dataObject = event.data.object;
+  const user = event.data.object.metadata.user;
+  let saldo = await admin.firestore().collection('datiFiscali').doc(user).get();
+  saldo = saldo.data().saldo;
+  saldo += event.data.object.total / 1000;
+  let newSaldo = {saldo: saldo};
+  await admin.firestore().collection('datiFiscali').doc(user).set(newSaldo); //update saldo in firestore.
+})
